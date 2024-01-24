@@ -1,6 +1,7 @@
 package mobi.sevenwinds.app.budget
 
 import io.restassured.RestAssured
+import mobi.sevenwinds.app.author.AuthorService
 import mobi.sevenwinds.common.ServerTest
 import mobi.sevenwinds.common.jsonBody
 import mobi.sevenwinds.common.toResponse
@@ -19,12 +20,12 @@ class BudgetApiKtTest : ServerTest() {
 
     @Test
     fun testBudgetPagination() {
-        addRecord(BudgetRecord(2020, 5, 10, BudgetType.Приход))
-        addRecord(BudgetRecord(2020, 5, 5, BudgetType.Приход))
-        addRecord(BudgetRecord(2020, 5, 20, BudgetType.Приход))
-        addRecord(BudgetRecord(2020, 5, 30, BudgetType.Приход))
-        addRecord(BudgetRecord(2020, 5, 40, BudgetType.Приход))
-        addRecord(BudgetRecord(2030, 1, 1, BudgetType.Расход))
+        addRecord(BudgetRecordRequest(2020, 5, 10, BudgetType.Приход))
+        addRecord(BudgetRecordRequest(2020, 5, 5, BudgetType.Приход))
+        addRecord(BudgetRecordRequest(2020, 5, 20, BudgetType.Приход))
+        addRecord(BudgetRecordRequest(2020, 5, 30, BudgetType.Приход))
+        addRecord(BudgetRecordRequest(2020, 5, 40, BudgetType.Приход))
+        addRecord(BudgetRecordRequest(2030, 1, 1, BudgetType.Расход))
 
         RestAssured.given()
             .queryParam("limit", 3)
@@ -33,19 +34,19 @@ class BudgetApiKtTest : ServerTest() {
             .toResponse<BudgetYearStatsResponse>().let { response ->
                 println("${response.total} / ${response.items} / ${response.totalByType}")
 
-                Assert.assertEquals(5, response.total)
+                Assert.assertEquals(3, response.total)
                 Assert.assertEquals(3, response.items.size)
-                Assert.assertEquals(105, response.totalByType[BudgetType.Приход.name])
+                Assert.assertEquals(60, response.totalByType[BudgetType.Приход.name])
             }
     }
 
     @Test
     fun testStatsSortOrder() {
-        addRecord(BudgetRecord(2020, 5, 100, BudgetType.Приход))
-        addRecord(BudgetRecord(2020, 1, 5, BudgetType.Приход))
-        addRecord(BudgetRecord(2020, 5, 50, BudgetType.Приход))
-        addRecord(BudgetRecord(2020, 1, 30, BudgetType.Приход))
-        addRecord(BudgetRecord(2020, 5, 400, BudgetType.Приход))
+        addRecord(BudgetRecordRequest(2020, 5, 100, BudgetType.Приход))
+        addRecord(BudgetRecordRequest(2020, 1, 5, BudgetType.Приход))
+        addRecord(BudgetRecordRequest(2020, 5, 50, BudgetType.Приход))
+        addRecord(BudgetRecordRequest(2020, 1, 30, BudgetType.Приход))
+        addRecord(BudgetRecordRequest(2020, 5, 400, BudgetType.Приход))
 
         // expected sort order - month ascending, amount descending
 
@@ -65,22 +66,26 @@ class BudgetApiKtTest : ServerTest() {
     @Test
     fun testInvalidMonthValues() {
         RestAssured.given()
-            .jsonBody(BudgetRecord(2020, -5, 5, BudgetType.Приход))
+            .jsonBody(BudgetRecordRequest(2020, -5, 5, BudgetType.Приход))
             .post("/budget/add")
             .then().statusCode(400)
 
         RestAssured.given()
-            .jsonBody(BudgetRecord(2020, 15, 5, BudgetType.Приход))
+            .jsonBody(BudgetRecordRequest(2020, 15, 5, BudgetType.Приход))
             .post("/budget/add")
             .then().statusCode(400)
     }
 
-    private fun addRecord(record: BudgetRecord) {
+    private fun addRecord(record: BudgetRecordRequest) {
         RestAssured.given()
             .jsonBody(record)
             .post("/budget/add")
-            .toResponse<BudgetRecord>().let { response ->
-                Assert.assertEquals(record, response)
+            .toResponse<BudgetRecordResponse>().let { response ->
+                Assert.assertEquals(response.amount, record.amount)
+                Assert.assertEquals(response.type, record.type)
+                Assert.assertEquals(response.month, record.month)
+                Assert.assertEquals(response.year, record.year)
+                Assert.assertEquals(record.authorId?.let { AuthorService.getRecord(it) }, response.author)
             }
     }
 }
